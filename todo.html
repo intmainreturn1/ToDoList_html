@@ -531,8 +531,11 @@
                     <input type="text" id="newCourseName" class="input-name" placeholder="例如: Vue3全家桶" required>
                 </div>
                 <div class="form-group">
-                    <label for="newCourseTotal">总课时</label>
-                    <input type="number" id="newCourseTotal" class="input-num" placeholder="总集数" min="1" required>
+                    <label for="newCourseTotal">
+                        总课时
+                        <small style="font-weight:normal">(可选)</small>
+                    </label>
+                    <input type="number" id="newCourseTotal" class="input-num" placeholder="总集数(未知可留空)" min="1">
                 </div>
                 <button class="btn btn-study" onclick="addItem('courses')">
                     <i class="fas fa-plus"></i> 新建课程
@@ -551,26 +554,22 @@
         <div class="section-divider"></div>
 
         <!-- 娱乐栏目 -->
-        <div class="content-section movie-section">
-            <h2>
-                <span class="section-icon"><i class="fas fa-film"></i></span>
-                娱乐
-            </h2>
-            
-            <!-- 添加新娱乐 -->
-            <div class="add-form movie-form">
-                <div class="form-group">
-                    <label for="newMovieName">名称</label>
-                    <input type="text" id="newMovieName" class="input-name" placeholder="例如: 权力的游戏" required>
-                </div>
-                <div class="form-group">
-                    <label for="newMovieTotal">总集数</label>
-                    <input type="number" id="newMovieTotal" class="input-num" placeholder="总集数" min="1" required>
-                </div>
-                <button class="btn btn-movie" onclick="addItem('movies')">
-                    <i class="fas fa-plus"></i> 新增
-                </button>
+        <div class="add-form movie-form">
+            <div class="form-group">
+                <label for="newMovieName">名称</label>
+                <input type="text" id="newMovieName" class="input-name" placeholder="例如: 权力的游戏" required>
             </div>
+            <div class="form-group">
+                <label for="newMovieTotal">
+                    总集数
+                    <small style="font-weight:normal">(可选)</small>
+                </label>
+                <input type="number" id="newMovieTotal" class="input-num" placeholder="总集数(未知可留空)" min="1">
+            </div>
+            <button class="btn btn-movie" onclick="addItem('movies')">
+                <i class="fas fa-plus"></i> 新增
+            </button>
+        </div>
 
             <!-- 正在观看的娱乐 -->
             <h3>🍿 正在观看</h3>
@@ -641,25 +640,26 @@
         }
 
         // 添加项目（课程或娱乐）
+        // 修改添加项目函数
         function addItem(type) {
             const nameId = type === 'courses' ? 'newCourseName' : 'newMovieName';
             const totalId = type === 'courses' ? 'newCourseTotal' : 'newMovieTotal';
-            
+
             const nameInput = document.getElementById(nameId);
             const totalInput = document.getElementById(totalId);
-            
-            const name = nameInput.value.trim();
-            const total = parseInt(totalInput.value);
 
-            if (!name || !total || total <= 0) { 
-                alert("请输入有效信息"); 
-                return; 
+            const name = nameInput.value.trim();
+            const total = totalInput.value ? parseInt(totalInput.value) : null; // 允许总集数为null
+
+            if (!name) { // 只验证名称必填
+                alert("请输入名称");
+                return;
             }
 
             data[type].push({
                 id: Date.now(),
                 name: name,
-                total: total,
+                total: total, // 可以是null
                 current: 0,
                 todayCount: 0,
                 lastDate: getTodayStr(),
@@ -673,25 +673,26 @@
             nameInput.value = '';
             totalInput.value = '';
             nameInput.focus();
-            
+
             saveAndRender();
         }
-
         // 更新进度
+        // 修改更新进度函数
         function updateProgress(type, id, inputElement) {
             const newVal = parseInt(inputElement.value);
             const item = data[type].find(c => c.id === id);
-            if (!item || isNaN(newVal)) return;
+            if (!item || isNaN(newVal) || newVal < 0) return;
 
-            // 限制数值范围
-            let validatedVal = Math.max(0, Math.min(newVal, item.total));
-            
+            // 总集数未知时不限制最大值
+            let validatedVal = item.total ? Math.min(newVal, item.total) : newVal;
+            validatedVal = Math.max(0, validatedVal);
+
             // 如果数值没变，不做处理
             if (validatedVal === item.current) return;
 
             const today = getTodayStr();
-            
-            // 跨天检查：如果是新的一天第一次操作，先把今日计数重置为0
+
+            // 跨天检查
             if (item.lastDate !== today) {
                 item.todayCount = 0;
                 item.lastDate = today;
@@ -699,7 +700,7 @@
 
             // 计算增量
             const delta = validatedVal - item.current;
-            
+
             // 更新今日计数
             item.todayCount = Math.max(0, item.todayCount + delta);
 
@@ -707,12 +708,11 @@
             item.current = validatedVal;
             item.lastStudyTime = getCurrentTime();
 
-            // 自动检测是否全部完成
-            if (item.current === item.total) {
-                // 稍微延迟一点给用户反应时间
+            // 只有总集数已知时才自动检测完成状态
+            if (item.total && item.current === item.total) {
                 setTimeout(() => {
                     const typeText = type === 'courses' ? '课程' : '娱乐';
-                    if(confirm(`《${item.name}》已达总${type === 'courses' ? '课时' : '集数'}，要标记为“已完结”吗？`)) {
+                    if (confirm(`《${item.name}》已达总${type === 'courses' ? '课时' : '集数'}，要标记为“已完结”吗？`)) {
                         markCompleted(type, id, true);
                     } else {
                         saveAndRender();
@@ -722,6 +722,7 @@
                 saveAndRender();
             }
         }
+
 
         // 手动强制完结
         function manualComplete(type, id) {
@@ -761,30 +762,31 @@
         }
 
         // 渲染指定类型的项目
+        // 渲染指定类型（课程/娱乐）的内容
         function renderType(type) {
+            const todayStr = getTodayStr();
+            const typeClass = type === 'courses' ? 'study-card' : 'movie-card';
+            const typeText = type === 'courses' ? '学习' : '观看';
             const activeContainer = document.getElementById(`active${type.charAt(0).toUpperCase() + type.slice(1)}`);
             const completedContainer = document.getElementById(`completed${type.charAt(0).toUpperCase() + type.slice(1)}`);
-            
+
+            // 筛选活跃和已完成项目
+            const activeItems = data[type].filter(item => item.status === 'active');
+            const completedItems = data[type].filter(item => item.status === 'completed');
+
+            // 清空容器
             activeContainer.innerHTML = '';
             completedContainer.innerHTML = '';
 
-            const items = data[type];
-            const todayStr = getTodayStr();
-            const typeClass = type === 'courses' ? 'study-card' : 'movie-card';
-            const unitText = type === 'courses' ? '课时' : '集数';
-            const typeText = type === 'courses' ? '学习' : '观看';
-
-            // 分离活跃和已完成的项目
-            const activeItems = items.filter(item => item.status === 'active');
-            const completedItems = items.filter(item => item.status === 'completed');
-
             // 渲染活跃项目
-            if (activeItems.length === 0) {
-                renderEmptyState(`active${type.charAt(0).toUpperCase() + type.slice(1)}`, type, true);
+            if (isListEmpty(activeItems)) {
+                renderEmptyState(activeContainer.id, type, true);
             } else {
                 activeItems.forEach(item => {
-                    const percent = Math.round((item.current / item.total) * 100);
-                    
+                    // 总集数未知时不显示百分比
+                    const hasTotal = item.total !== null;
+                    const percent = hasTotal ? Math.round((item.current / item.total) * 100) : null;
+
                     // 跨天显示逻辑
                     let displayToday = item.todayCount;
                     if (item.lastDate !== todayStr) {
@@ -795,92 +797,99 @@
                     card.className = `course-card ${typeClass} ${item.status}`;
 
                     card.innerHTML = `
-                        <div class="card-header">
-                            <div class="card-title">${item.name}</div>
-                            <div class="percent-badge">${percent}%</div>
+                    <div class="card-header">
+                        <div class="card-title">${item.name}</div>
+                        <div class="percent-badge">
+                            ${hasTotal ? `${percent}%` : `第${item.current}集`}
                         </div>
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill" style="width: ${percent}%"></div>
-                        </div>
-                        <div class="info-row">
-                            <i class="far fa-clock"></i>
-                            上次${typeText}: ${item.lastStudyTime}
-                        </div>
-                        
-                        <div class="stats-row">
-                            <div class="stat-item">
-                                <div class="input-control-row">
-                                    <small>当前:</small>
-                                    <input type="number" value="${item.current}" 
-                                           onchange="updateProgress('${type}', ${item.id}, this)"
-                                           onkeydown="if(event.key==='Enter') this.blur()">
-                                    <span>/ ${item.total}</span>
-                                </div>
-                            </div>
-                            <div class="stat-item" style="text-align:right">
-                                <small style="color:#999">今日完成</small>
-                                <strong class="stat-today">${displayToday > 0 ? '+' + displayToday : displayToday}</strong>
-                            </div>
-                        </div>
-
-                        <div class="action-row">
-                            <button class="delete-btn" onclick="deleteItem('${type}', ${item.id})">
-                                <i class="fas fa-trash-alt"></i> 删除
-                            </button>
-                            <button class="btn btn-outline" onclick="manualComplete('${type}', ${item.id})">
-                                ✅ 完结
-                            </button>
-                        </div>
-                    `;
+                    </div>
+                    ${hasTotal ? `
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: ${percent}%"></div>
+                    </div>` : ''}
+                    <div class="info-row">
+                        <i class="far fa-clock"></i>
+                        上次${typeText}: ${item.lastStudyTime}
+                    </div>
                     
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <div class="input-control-row">
+                                <small>当前:</small>
+                                <input type="number" value="${item.current}" 
+                                    onchange="updateProgress('${type}', ${item.id}, this)"
+                                    onkeydown="if(event.key==='Enter') this.blur()">
+                                <span>${hasTotal ? `/ ${item.total}` : ''}</span>
+                            </div>
+                        </div>
+                        <div class="stat-item" style="text-align:right">
+                            <small style="color:#999">今日完成</small>
+                            <strong class="stat-today">${displayToday > 0 ? '+' + displayToday : displayToday}</strong>
+                        </div>
+                    </div>
+
+                    <div class="action-row">
+                        <button class="delete-btn" onclick="deleteItem('${type}', ${item.id})">
+                            <i class="fas fa-trash-alt"></i> 删除
+                        </button>
+                        <button class="btn btn-outline" onclick="manualComplete('${type}', ${item.id})">
+                            ✅ 完结
+                        </button>
+                    </div>
+                `;
+
                     activeContainer.appendChild(card);
                 });
             }
 
             // 渲染已完成项目
-            if (completedItems.length === 0) {
-                renderEmptyState(`completed${type.charAt(0).toUpperCase() + type.slice(1)}`, type, false);
+            if (isListEmpty(completedItems)) {
+                renderEmptyState(completedContainer.id, type, false);
             } else {
                 completedItems.forEach(item => {
-                    const percent = Math.round((item.current / item.total) * 100);
-                    const isPerfect = item.current >= item.total;
-                    const endStatus = isPerfect ? "完美完结" : `完结于 ${item.current}/${item.total} ${unitText}`;
-                    const statusColor = isPerfect ? "var(--success-color)" : "#f39c12";
+                    const hasTotal = item.total !== null;
+                    const percent = hasTotal ? 100 : null;
 
                     const card = document.createElement('div');
                     card.className = `course-card ${typeClass} ${item.status}`;
 
                     card.innerHTML = `
-                        <div class="card-header">
-                            <div class="card-title">${item.name}</div>
-                            <div class="percent-badge">${percent}%</div>
+                    <div class="card-header">
+                        <div class="card-title">${item.name}</div>
+                        <div class="percent-badge">
+                            ${hasTotal ? '100%' : `已完结 (共${item.current}集)`}
                         </div>
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill" style="width: ${percent}%"></div>
-                        </div>
-                        <div class="info-row">
-                            <i class="far fa-calendar-alt"></i>
-                            开始: ${item.startTime.split(' ')[0]}
-                        </div>
-                        <div class="info-row">
-                            <i class="far fa-flag-checkered"></i>
-                            结束: ${item.endTime}
-                        </div>
-                        
-                        <div class="stats-row" style="background:#fafafa">
-                            <div class="stat-item">
-                                <small>最终状态</small>
-                                <strong style="color:${statusColor}">${endStatus}</strong>
-                            </div>
-                        </div>
-                        
-                        <div class="action-row">
-                            <button class="delete-btn" onclick="deleteItem('${type}', ${item.id})">
-                                <i class="fas fa-trash-alt"></i> 删除记录
-                            </button>
-                        </div>
-                    `;
+                    </div>
+                    ${hasTotal ? `
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: 100%"></div>
+                    </div>` : ''}
+                    <div class="info-row">
+                        <i class="far fa-calendar-check"></i>
+                        完成于: ${item.endTime || '未知时间'}
+                    </div>
                     
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <small>总${type === 'courses' ? '课时' : '集数'}:</small>
+                            <strong>${hasTotal ? item.total : item.current}</strong>
+                        </div>
+                        <div class="stat-item" style="text-align:right">
+                            <small>开始于:</small>
+                            <strong>${item.startTime.split(' ')[0]}</strong>
+                        </div>
+                    </div>
+
+                    <div class="action-row">
+                        <button class="delete-btn" onclick="deleteItem('${type}', ${item.id})">
+                            <i class="fas fa-trash-alt"></i> 删除
+                        </button>
+                        <button class="btn btn-outline" onclick="markCompleted('${type}', ${item.id}, false)">
+                            ↩️ 重新开始
+                        </button>
+                    </div>
+                `;
+
                     completedContainer.appendChild(card);
                 });
             }
